@@ -40,6 +40,14 @@ reduces the networking load enormously:
   384` (states retrieval packets) to `O(accounts + SUM(states)) / 100000 bytes` (number of
   100KB chucks to cover the state).
 
+## RLP Types
+
+The RLP definitions below use the shared [RLP notation] plus the following local notes:
+
+- `P`: `reqID` values are treated as `uint64` (`// up to 8 bytes`).
+- `B`: variable-length byte strings are budgeted by the enclosing response or request
+  size.
+
 ### Expected results
 
 To put some numbers on the above abstract orders of magnitudes, synchronizing Ethereum
@@ -151,7 +159,7 @@ the network.
 
 ### GetAccountRange (0x00)
 
-`[reqID: P, rootHash: B_32, startingHash: B_32, limitHash: B_32, responseBytes: P]`
+`[reqID: P // up to 8 bytes, rootHash: B_32 // 32!, startingHash: B_32 // 32!, limitHash: B_32 // 32!, responseBytes: P // up to 8 bytes]`
 
 Requests an unknown number of accounts from a given account trie, starting at the
 specified account hash and capped by the maximum allowed response size in bytes. The
@@ -198,7 +206,7 @@ Caveats:
 
 ### AccountRange (0x01)
 
-`[reqID: P, accounts: [[accHash: B_32, accBody: B], ...], proof: [node_1: B, node_2, ...]]`
+`[reqID: P // up to 8 bytes, accounts: [[accHash: B_32 // 32!, accBody: B // up to 16777215 bytes], ...] // up to 16777215 bytes, up to 16777215 items, proof: [node_1: B // up to 16777215 bytes, node_2, ...] // up to 16777215 bytes, up to 16777215 items]`
 
 Returns a number of consecutive accounts and the Merkle proofs for the entire range
 (boundary proofs). The left-side proof must be for the requested origin hash (even if an
@@ -220,7 +228,7 @@ Notes:
 
 ### GetStorageRanges (0x02)
 
-`[reqID: P, rootHash: B_32, accountHashes: [B_32], startingHash: B, limitHash: B, responseBytes: P]`
+`[reqID: P // up to 8 bytes, rootHash: B_32 // 32!, accountHashes: [B_32 // 32!] // up to 16777215 bytes, up to 16777215 items, startingHash: B // up to 32 bytes, limitHash: B // up to 32 bytes, responseBytes: P // up to 8 bytes]`
 
 Requests the storage slots of multiple accounts' storage tries. Since certain contracts
 have huge state, the method can also request storage slots from a single account, starting
@@ -279,7 +287,7 @@ Caveats:
 
 ### StorageRanges (0x03)
 
-`[reqID: P, slots: [[[slotHash: B_32, slotData: B], ...], ...], proof: [node_1: B, node_2, ...]]`
+`[reqID: P // up to 8 bytes, slots: [[[slotHash: B_32 // 32!, slotData: B // up to 16777215 bytes], ...], ...] // up to 16777215 bytes, up to 16777215 items, proof: [node_1: B // up to 16777215 bytes, node_2, ...] // up to 16777215 bytes, up to 16777215 items]`
 
 Returns a number of consecutive storage slots for the requested account (i.e. list of list
 of slots) and optionally the Merkle proofs for the last range (boundary proofs) if it only
@@ -299,7 +307,7 @@ Notes:
 
 ### GetByteCodes (0x04)
 
-`[reqID: P, hashes: [hash1: B_32, hash2: B_32, ...], bytes: P]`
+`[reqID: P // up to 8 bytes, hashes: [hash1: B_32 // 32!, hash2: B_32 // 32!, ...] // up to 16777215 bytes, up to 16777215 items, bytes: P // up to 8 bytes]`
 
 Requests a number of contract byte-codes by hash. This is analogous to the `eth/63`
 `GetNodeData`, but restricted to only bytecode to break the generality that causes issues
@@ -345,7 +353,7 @@ Caveats:
 
 ### ByteCodes (0x05)
 
-`[reqID: P, codes: [code1: B, code2: B, ...]]`
+`[reqID: P // up to 8 bytes, codes: [code1: B // up to 16777215 bytes, code2: B // up to 16777215 bytes, ...] // up to 16777215 bytes, up to 16777215 items]`
 
 Returns a number of requested contract codes. The order is the same as in the request, but
 there might be gaps if not all codes are available or there might be fewer is QoS limits
@@ -353,7 +361,7 @@ are reached.
 
 ### GetTrieNodes (0x06)
 
-`[reqID: P, rootHash: B_32, paths: [[accPath: B, slotPath1: B, slotPath2: B, ...]...], bytes: P]`
+`[reqID: P // up to 8 bytes, rootHash: B_32 // 32!, paths: [[accPath: B // up to 32 bytes, slotPath1: B // up to 32 bytes, slotPath2: B // up to 32 bytes, ...] ...] // up to 16777215 bytes, up to 16777215 items, bytes: P // up to 8 bytes]`
 
 Requests a number of state (either account or storage) Merkle trie nodes **by path**. This
 is analogous in functionality to the `eth/63` `GetNodeData`, but restricted to only tries
@@ -399,7 +407,7 @@ Rationale:
 
 ### TrieNodes (0x07)
 
-`[reqID: P, nodes: [node1: B, node2: B, ...]]`
+`[reqID: P // up to 8 bytes, nodes: [node1: B // up to 16777215 bytes, node2: B // up to 16777215 bytes, ...] // up to 16777215 bytes, up to 16777215 items]`
 
 Returns a number of requested state trie nodes. The order is the same as in the request,
 but there might be fewer is QoS limits are reached.
@@ -410,6 +418,7 @@ but there might be fewer is QoS limits are reached.
 
 Version 1 was the introduction of the snapshot protocol.
 
+[RLP notation]: ../rlp.md
 [RLPx]: ../rlpx.md
 [dynamic snapshots]: https://github.com/ethereum/go-ethereum/pull/20152
 [blog for more]: https://blog.ethereum.org/2020/07/17/ask-about-geth-snapshot-acceleration/

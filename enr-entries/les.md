@@ -8,8 +8,13 @@ served by LES.
 
 ## Entry Format
 
+The RLP definitions below use the shared [RLP notation].
+
     entry-key   = "les"
-    entry-value = [ vflux-version ]
+    entry-value = [
+        vflux-version: P,  // up to 8 bytes
+        ...
+    ]
 
 At this time, the "les" entry is a single element list containing the version number of
 the 'vflux' payment protocol.
@@ -28,5 +33,6 @@ In March 2021, the les entry was updated to include the vflux version number.
 The initial version of the les entry was an empty list with the sole purpose of
 signaling LES server support.
 
+[RLP notation]: ../rlp.md
 [les capability]: ../caps/les.md
 [eth entry]: ./eth.md

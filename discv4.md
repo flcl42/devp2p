@@ -69,6 +69,19 @@ seen, the initiator resends the find node to all of the `k` closest nodes it has
 already queried. The lookup terminates when the initiator has queried and gotten responses
 from the `k` closest nodes it has seen.
 
+## RLP Types
+
+The packet layouts below use the shared [RLP notation] plus the following local aliases:
+
+- `IP`: IPv4 or IPv6 address byte string, up to 16 bytes.
+- `Port`: UDP/TCP port encoded as a big-endian `uint16` RLP integer.
+- `Endpoint`: endpoint triple `[ip, udp-port, tcp-port]`, with at most 3 list items.
+- `Seq`: ENR sequence number encoded as a `uint64` RLP integer.
+- `Expiry`: UNIX timestamp encoded as a `uint64` RLP integer.
+- `Hash32`: Keccak256 hash, fixed at 32 bytes.
+- `NodeID`: uncompressed secp256k1 public key, fixed at 64 bytes.
+- `ENR`: node record as defined in [node record], capped at 300 encoded bytes.
+
 ## Wire Protocol
 
 Node discovery messages are sent as UDP datagrams. The maximum size of any packet is 1280
@@ -96,10 +109,24 @@ as well as any extra data after the list.
 
 ### Ping Packet (0x01)
 
-    packet-data = [version, from, to, expiration, enr-seq ...]
-    version = 4
-    from = [sender-ip, sender-udp-port, sender-tcp-port]
-    to = [recipient-ip, recipient-udp-port, 0]
+    packet-data = [
+        version: 4,         // 1!
+        from: Endpoint,     // up to 20 bytes, up to 3 items
+        to: Endpoint,       // up to 18 bytes, up to 3 items
+        expiration: Expiry, // up to 8 bytes
+        enr-seq: Seq,       // up to 8 bytes
+        ...
+    ]
+    from = [
+        sender-ip: IP,            // up to 16 bytes
+        sender-udp-port: Port,    // up to 2 bytes
+        sender-tcp-port: Port,    // up to 2 bytes
+    ]
+    to = [
+        recipient-ip: IP,             // up to 16 bytes
+        recipient-udp-port: Port,     // up to 2 bytes
+        recipient-tcp-port: 0,        // 0!
+    ]
 
 The `expiration` field is an absolute UNIX time stamp. Packets containing a time stamp
 that lies in the past are expired may not be processed.
@@ -116,7 +143,13 @@ sent in addition to pong in order to receive an endpoint proof.
 
 ### Pong Packet (0x02)
 
-    packet-data = [to, ping-hash, expiration, enr-seq, ...]
+    packet-data = [
+        to: Endpoint,        // up to 20 bytes, up to 3 items
+        ping-hash: Hash32,   // 32!
+        expiration: Expiry,  // up to 8 bytes
+        enr-seq: Seq,        // up to 8 bytes
+        ...
+    ]
 
 Pong is the reply to ping.
 
@@ -129,7 +162,11 @@ optional.
 
 ### FindNode Packet (0x03)
 
-    packet-data = [target, expiration, ...]
+    packet-data = [
+        target: NodeID,      // 64!
+        expiration: Expiry,  // up to 8 bytes
+        ...
+    ]
 
 A FindNode packet requests information about nodes close to `target`. The `target` is a
 64-byte secp256k1 public key. When FindNode is received, the recipient should reply with
@@ -140,14 +177,25 @@ the sender of FindNode has been verified by the endpoint proof procedure.
 
 ### Neighbors Packet (0x04)
 
-    packet-data = [nodes, expiration, ...]
-    nodes = [[ip, udp-port, tcp-port, node-id], ...]
+    packet-data = [
+        nodes: [Node, ...],  // up to 1008 bytes, up to 12 items
+        expiration: Expiry,  // up to 8 bytes
+        ...
+    ]
+    node = [
+        ip: IP,              // up to 16 bytes
+        udp-port: Port,      // up to 2 bytes
+        tcp-port: Port,      // up to 2 bytes
+        node-id: NodeID,     // 64!
+    ]
 
 Neighbors is the reply to [FindNode].
 
 ### ENRRequest Packet (0x05)
 
-    packet-data = [expiration]
+    packet-data = [
+        expiration: Expiry,  // up to 8 bytes
+    ]
 
 When a packet of this type is received, the node should reply with an ENRResponse packet
 containing the current version of its [node record].
@@ -159,7 +207,10 @@ refers to a time in the past.
 
 ### ENRResponse Packet (0x06)
 
-    packet-data = [request-hash, ENR]
+    packet-data = [
+        request-hash: Hash32,  // 32!
+        ENR: ENR,              // up to 300 bytes, up to 300 items
+    ]
 
 This packet is the response to ENRRequest.
 
@@ -202,4 +253,5 @@ list elements in `packet-data`.
 [ENRResponse]: #enrresponse-packet-0x06
 [EIP-8]: https://eips.ethereum.org/EIPS/eip-8
 [EIP-868]: https://eips.ethereum.org/EIPS/eip-868
+[RLP notation]: ./rlp.md
 [node record]: ./enr.md

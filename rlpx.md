@@ -28,6 +28,9 @@ the end of this document.
 `ecdh.agree(PRIVKEY, PUBKEY)`\
     is elliptic curve Diffie-Hellman key agreement between PRIVKEY and PUBKEY.
 
+For the shared RLP primitive types and trailing limit comments used in the message layouts
+below, see [RLP notation].
+
 ## ECIES Encryption
 
 ECIES (Elliptic Curve Integrated Encryption Scheme) is an asymmetric encryption method
@@ -91,19 +94,33 @@ Handshake messages:
     auth = auth-size || enc-auth-body
     auth-size = size of enc-auth-body, encoded as a big-endian 16-bit integer
     auth-vsn = 4
-    auth-body = [sig, initiator-pubk, initiator-nonce, auth-vsn, ...]
+    auth-body = [
+        sig: B_65,              // 65!
+        initiator-pubk: B_64,   // 64!
+        initiator-nonce: B_32,  // 32!
+        auth-vsn: 4,            // 1!
+        ...
+    ]
     enc-auth-body = ecies.encrypt(recipient-pubk, auth-body || auth-padding, auth-size)
     auth-padding = arbitrary data
 
     ack = ack-size || enc-ack-body
     ack-size = size of enc-ack-body, encoded as a big-endian 16-bit integer
     ack-vsn = 4
-    ack-body = [recipient-ephemeral-pubk, recipient-nonce, ack-vsn, ...]
+    ack-body = [
+        recipient-ephemeral-pubk: B_64,  // 64!
+        recipient-nonce: B_32,           // 32!
+        ack-vsn: 4,                      // 1!
+        ...
+    ]
     enc-ack-body = ecies.encrypt(initiator-pubk, ack-body || ack-padding, ack-size)
     ack-padding = arbitrary data
 
 Implementations must ignore any mismatches in `auth-vsn` and `ack-vsn`. Implementations
 must also ignore any additional list elements in `auth-body` and `ack-body`.
+
+Geth currently rejects base-protocol handshake messages larger than 2048 bytes, so the
+`auth-body` and `ack-body` payloads above are practically budgeted by that envelope.
 
 Secrets generated following the exchange of handshake messages:
 
@@ -131,7 +148,10 @@ components are byte-aligned to block size of cipher.
     frame = header-ciphertext || header-mac || frame-ciphertext || frame-mac
     header-ciphertext = aes(aes-secret, header)
     header = frame-size || header-data || header-padding
-    header-data = [capability-id, context-id]
+    header-data = [
+        capability-id: 0,  // 0!
+        context-id: 0,     // 0!
+    ]
     capability-id = integer, always zero
     context-id = integer, always zero
     header-padding = zero-fill header to 16-byte boundary
@@ -210,6 +230,9 @@ decoding the message. This is possible because the [snappy format] contains a le
 header. Messages carrying uncompressed data larger than 16 MiB should be rejected by
 closing the connection.
 
+The practical upper bound for `msg-data` in geth is `16,777,215` bytes, matching the
+24-bit RLPx frame length field.
+
 ## Message ID-based Multiplexing
 
 While the framing layer supports a `capability-id`, the current version of RLPx doesn't
@@ -241,7 +264,18 @@ At any time after protocol negotiation, a [Disconnect] message may be sent.
 
 ### Hello (0x00)
 
-`[protocolVersion: P, clientId: B, capabilities, listenPort: P, nodeKey: B_64, ...]`
+    [
+        protocolVersion: P,              // up to 1 bytes
+        clientId: B,                     // up to 2048 bytes
+        capabilities: [Capability, ...], // up to 2048 bytes, up to 2048 items
+        listenPort: P,                   // up to 2 bytes
+        nodeKey: B_64,                   // 64!
+        ...
+    ]
+    capability = [
+        cap: B,          // up to 8 bytes
+        capVersion: P,   // up to 8 bytes
+    ]
 
 First packet sent over the connection, and sent once by both sides. No other messages may
 be sent until a Hello is received. Implementations must ignore any additional list elements
@@ -259,7 +293,9 @@ in Hello because they may be used by a future version.
 
 ### Disconnect (0x01)
 
-`[reason: P]`
+    [
+        reason: P,  // up to 1 bytes
+    ]
 
 Inform the peer that a disconnection is imminent; if received, a peer should disconnect
 immediately. When sending, well-behaved hosts give their peers a fighting chance (read:
@@ -285,13 +321,13 @@ wait 2 seconds) to disconnect to before disconnecting themselves.
 
 ### Ping (0x02)
 
-`[]`
+    []
 
 Requests an immediate reply of [Pong] from the peer.
 
 ### Pong (0x03)
 
-`[]`
+    []
 
 Reply to the peer's [Ping] packet.
 
@@ -347,5 +383,6 @@ Creative Commons Attribution-NonCommercial-ShareAlike
 [Capability Messaging]: #capability-messaging
 [EIP-8]: https://eips.ethereum.org/EIPS/eip-8
 [EIP-706]: https://eips.ethereum.org/EIPS/eip-706
+[RLP notation]: ./rlp.md
 [RLP]: https://ethereum.org/en/developers/docs/data-structures-and-encoding/rlp
 [snappy format]: https://github.com/google/snappy/blob/master/format_description.txt

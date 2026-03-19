@@ -77,6 +77,12 @@ at risk to a DoS attack where peers feed it a long list of incorrect hashes. But
 Syncing clients are only vulnerable until they've finished downloading the full network
 state, so the payoff for such an attack is smaller.
 
+## RLP Types
+
+The RLP definitions below use the shared [RLP notation] plus the following local note:
+
+- `P`: `reqID` values are treated as `uint64` (`// up to 8 bytes`).
+
 ## Protocol Messages
 
 ### RESERVED (0x00)
@@ -85,7 +91,7 @@ This command is undefined, held in place for a possible future Status message.
 
 ### GetBlockWitnessHashes (0x01)
 
-`[reqID: P, blockHash: B_32]`
+`[reqID: P // up to 8 bytes, blockHash: B_32 // 32!]`
 
 Requests a list of trie node hashes used by a given block.
 
@@ -100,7 +106,7 @@ Notes:
 
 ### BlockWitnessHashes (0x02)
 
-`[reqID: P, witnessHashes: [trieNodeHash: B_32, ...]]`
+`[reqID: P // up to 8 bytes, witnessHashes: [trieNodeHash: B_32 // 32!, ...] // up to 16777215 bytes, up to 16777215 items]`
 
 Returns a list of the trie node hashes that were read during execution and validation of
 the given block.
@@ -114,4 +120,5 @@ the given block.
 
 Version 0 was the introduction of the witness protocol.
 
+[RLP notation]: ../rlp.md
 [RLPx]: ../rlpx.md

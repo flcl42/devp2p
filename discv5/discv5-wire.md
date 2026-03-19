@@ -22,6 +22,13 @@ Here we present the notation that is used throughout this document.
 `aesgcm_encrypt(key, nonce, pt, ad)`\
     is AES-GCM encryption/authentication with the given `key`, `nonce` and additional\
     authenticated data `ad`. Size of `key` is 16 bytes (AES-128), size of `nonce` 12 bytes.
+`ReqID`\
+    is an RLP byte string no longer than 8 bytes.\
+`ENR`\
+    is a node record as defined in [EIP-778], capped at 300 encoded bytes.\
+
+For the shared RLP primitive types and trailing limit comments used below, see
+[RLP notation].
 
 ## UDP Communication
 
@@ -166,7 +173,10 @@ response. The selection of appropriate values for request IDs is left to the imp
 
 ### PING Request (0x01)
 
-    message-data = [request-id, enr-seq]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        enr-seq: P,         // up to 8 bytes
+    ]
     message-type = 0x01
     enr-seq      = local ENR sequence number of sender
 
@@ -175,7 +185,12 @@ number.
 
 ### PONG Response (0x02)
 
-    message-data   = [request-id, enr-seq, recipient-ip, recipient-port]
+    message-data = [
+        request-id: ReqID,      // up to 8 bytes
+        enr-seq: P,             // up to 8 bytes
+        recipient-ip: B,        // up to 16 bytes
+        recipient-port: P,      // up to 2 bytes
+    ]
     message-type   = 0x02
     enr-seq        = ENR sequence number of sender
     recipient-ip   = 16 or 4 byte IP address of the intended recipient
@@ -185,7 +200,10 @@ PONG is the reply to PING.
 
 ### FINDNODE Request (0x03)
 
-    message-data = [request-id, [distance₁, distance₂, ..., distanceₙ]]
+    message-data = [
+        request-id: ReqID,                // up to 8 bytes
+        [distance₁: P, ..., distanceₙ],   // up to 512 bytes, up to 256 items
+    ]
     message-type = 0x03
     distanceₙ    = requested log2 distance, a positive integer
 
@@ -199,7 +217,11 @@ the result set. The recommended result limit for FINDNODE queries is 16 nodes.
 
 ### NODES Response (0x04)
 
-    message-data = [request-id, total, [ENR, ...]]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        total: P,           // up to 8 bytes
+        [ENR, ...],         // up to 1000 bytes, up to 16 items
+    ]
     message-type = 0x04
     total        = total number of responses to the request
 
@@ -210,9 +232,17 @@ maximum for `total`. If exceeded, additional responses may be ignored.
 When handling NODES as a response to FINDNODE, the recipient should verify that the
 received nodes match the requested distances.
 
+The `up to 1000 bytes, up to 16 items` bound above is implementation-derived from geth: ENR packing is constrained
+by the 1280-byte packet budget, with roughly 1000 bytes reserved for ENR payload in each
+NODES packet and at most 16 FINDNODE results produced overall.
+
 ### TALKREQ Request (0x05)
 
-    message-data = [request-id, protocol, request]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        protocol: B,        // up to 1280 bytes
+        request: B,         // up to 1280 bytes
+    ]
     message-type = 0x05
 
 TALKREQ sends an application-level request. The purpose of this message is pre-negotiating
@@ -225,7 +255,10 @@ containing empty `response` data.
 
 ### TALKRESP Response (0x06)
 
-    message-data = [request-id, response]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        response: B,        // up to 1280 bytes
+    ]
     message-type = 0x06
     request-id   = request-id of TALKREQ
 
@@ -237,10 +270,16 @@ response data.
 **NOTE: the content and semantics of this message are not final.**
 **Implementations should not respond to or send these messages.**
 
-    message-data = [request-id, topic, ENR, ticket]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        topic: B_32,        // 32!
+        ENR: ENR,           // up to 300 bytes, up to 300 items
+        ticket: B,          // up to 1280 bytes
+    ]
     message-type = 0x07
     node-record  = current node record of sender
     ticket       = byte array containing ticket content
+    topic        = 32-byte topic hash
 
 REGTOPIC attempts to register the sender for the given topic. If the requesting node has a
 ticket from a previous registration attempt, it must present the ticket. Otherwise
@@ -256,7 +295,11 @@ confirmation to be sent.
 **NOTE: the content and semantics of this message are not final.**
 **Implementations should not respond to or send these messages.**
 
-    message-data = [request-id, ticket, wait-time]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        ticket: B,          // up to 1280 bytes
+        wait-time: P,       // up to 8 bytes
+    ]
     message-type = 0x08
     ticket       = an opaque byte array representing the ticket
     wait-time    = time to wait before registering, in seconds
@@ -270,7 +313,10 @@ more information.
 **NOTE: the content and semantics of this message are not final.**
 **Implementations should not respond to or send these messages.**
 
-    message-data = [request-id, topic]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        topic: B_32,        // 32!
+    ]
     message-type = 0x09
     request-id   = request-id of REGTOPIC
 
@@ -283,7 +329,10 @@ registration has elapsed on a topic queue.
 **NOTE: the content and semantics of this message are not final.**
 **Implementations should not respond to or send these messages.**
 
-    message-data = [request-id, topic]
+    message-data = [
+        request-id: ReqID,  // up to 8 bytes
+        topic: B_32,        // 32!
+    ]
     message-type = 0x0a
     topic        = 32-byte topic hash
 
@@ -299,5 +348,6 @@ A collection of test vectors for this specification can be found at
 [handshake section]: ./discv5-theory.md#handshake-steps
 [topic queue]: ./discv5-theory.md#topic-table
 [theory section on tickets]: ./discv5-theory.md#tickets
+[RLP notation]: ../rlp.md
 [EIP-778]: ../enr.md
 [discv5 wire test vectors]: ./discv5-wire-test-vectors.md

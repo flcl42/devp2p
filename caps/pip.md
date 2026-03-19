@@ -26,6 +26,9 @@ wire message formats the following symbols apply:
 
 `...` means additional list elements
 
+For the shared RLP primitive types and trailing limit comments used below, see
+[RLP notation].
+
 ## Handshake
 
 After the initial RLPx handshake, the first message that must be communicated is from the
@@ -68,9 +71,9 @@ header or gas requested, respectively. The table also includes a base cost, whic
 applied for every [Request Batch].
 
     cost_table = [base_cost, [id,cost],...]
-    base_cost = positive integer cost applied to a request batch.
-    id = identifier of an individual PIP message type
-    cost = positive integer to apply to cost calculations for this message type
+    base_cost = positive integer cost applied to a request batch.   // up to 8 bytes
+    id = identifier of an individual PIP message type               // up to 8 bytes
+    cost = positive integer to apply to cost calculations for this message type // up to 8 bytes
 
 ### Announcement (0x01)
 
@@ -161,12 +164,12 @@ where `n` is an identifier labelling the field in the response message body.
 *Loose inputs* may be a back-reference to a *reusable output* or may be hard data.
 
     loose_input = [raw_flag, input]
-    raw_flag = is 0 or 1 (a.k.a. 'discriminant')
+    raw_flag = is 0 or 1 (a.k.a. 'discriminant')                    // up to 1 bytes
     input = if raw_flag is 0, this is the RLP encoded value
-            if raw_flag is 1, this is back_reference
-    back_reference = [request_message_index, reusable_output]
-    request_message_index = the 0-based position of a prior message in the request batch
-    reusable_output = the unsigned integer identifying the corresponding response message field
+            if raw_flag is 1, this is back_reference                // up to 10485760 bytes, up to 10485760 items
+    back_reference = [request_message_index, reusable_output]       // up to 16 bytes, up to 2 items
+    request_message_index = the 0-based position of a prior message in the request batch // up to 8 bytes
+    reusable_output = the unsigned integer identifying the corresponding response message field // up to 8 bytes
 
 The following are the individual messages, paired as requests and their responses.
 
@@ -345,6 +348,7 @@ Request for Merkle proofs of a contract execution.
 - `node1` merkle tree node as byte array
 
 [LES specification]: ./les.md
+[RLP notation]: ../rlp.md
 [ETH]: ./eth.md
 [Cost Table]: #cost-table
 [Canonical Hash Tries]: ./les.md#canonical-hash-trie

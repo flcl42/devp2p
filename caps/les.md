@@ -156,6 +156,12 @@ Every on-demand request message contains a `reqID` field, which is simply return
 server in the corresponding reply message. This helps matching replies for requests on the
 client side so that each reply doesn't need to be matched against each pending request.
 
+## RLP Types
+
+The RLP definitions below use the shared [RLP notation] plus the following local note:
+
+- `P`: `reqID` and `BV` values are typically `uint64`, i.e. `// up to 8 bytes`.
+
 ## Protocol Messages
 
 ### Status (0x00)
@@ -494,5 +500,6 @@ Update flow control buffer and allow sending requests again. Note that the reque
 [TxStatus]: #txstatus-0x15
 [StopMsg]: #stopmsg-0x16
 [ResumeMsg]: #resumemsg-0x17
+[RLP notation]: ../rlp.md
 [Ethereum Wire Protocol]: ./eth.md
 [Merkle Patricia Trie]: https://github.com/ethereum/wiki/wiki/Patricia-Tree

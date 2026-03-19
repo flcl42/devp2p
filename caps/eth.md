@@ -25,6 +25,17 @@ per message type. Limiting requests and responses ensures that concurrent activi
 block synchronization and transaction exchange work smoothly over the same peer
 connection.
 
+### RLP Types
+
+The RLP definitions below use the shared [RLP notation] plus the following eth-specific
+conventions:
+
+- `P`: in eth wire messages this is typically a `uint64`, i.e. `// up to 8 bytes`, unless
+  a narrower value is stated.
+- `B`: unless noted otherwise, opaque `B` values are budgeted by the enclosing 10 MiB eth
+  message cap in geth.
+- `txₙ`: transaction object, either `legacy-tx` or opaque `typed-tx`.
+
 ### Chain Synchronization
 
 The chain is obtained by downloading it from other peers. It is generally expected that
@@ -133,21 +144,21 @@ this specification, we refer to transactions of either encoding using the identi
 Untyped, legacy transactions are given as an RLP list.
 
     legacy-tx = [
-        nonce: P,
-        gas-price: P,
-        gas-limit: P,
-        recipient: {B_0, B_20},
-        value: P,
-        data: B,
-        V: P,
-        R: P,
-        S: P,
+        nonce: P,                // up to 8 bytes
+        gas-price: P,            // up to 32 bytes
+        gas-limit: P,            // up to 8 bytes
+        recipient: {B_0, B_20},  // up to 20 bytes
+        value: P,                // up to 32 bytes
+        data: B,                 // up to 131072 bytes
+        V: P,                    // up to 32 bytes
+        R: P,                    // up to 32 bytes
+        S: P,                    // up to 32 bytes
     ]
 
 [EIP-2718] typed transactions are encoded as RLP byte arrays where the first byte is the
 transaction type (`tx-type`) and the remaining bytes are opaque type-specific data.
 
-    typed-tx = tx-type || tx-data
+    typed-tx = tx-type || tx-data // up to 131073 bytes
 
 Transactions must be validated when they are received. Validity depends on the Ethereum
 chain state. The specific kind of validity this specification is concerned with is not
@@ -189,40 +200,48 @@ operating under slightly different validation rules.
 Ethereum block headers are encoded as follows:
 
     header = [
-        parent-hash: B_32,
-        ommers-hash: B_32,
-        coinbase: B_20,
-        state-root: B_32,
-        txs-root: B_32,
-        receipts-root: B_32,
-        bloom: B_256,
-        difficulty: P,
-        number: P,
-        gas-limit: P,
-        gas-used: P,
-        time: P,
-        extradata: B,
-        mix-digest: B_32,
-        block-nonce: B_8,
-        basefee-per-gas: P,
-        withdrawals-root: B_32,
-        blob-gas-used: P,
-        excess-blob-gas: P,
-        parent-beacon-root: B_32,
-        requests-hash: B_32,
+        parent-hash: B_32,         // 32!
+        ommers-hash: B_32,         // 32!
+        coinbase: B_20,            // 20!
+        state-root: B_32,          // 32!
+        txs-root: B_32,            // 32!
+        receipts-root: B_32,       // 32!
+        bloom: B_256,              // 256!
+        difficulty: P,             // up to 32 bytes
+        number: P,                 // up to 8 bytes
+        gas-limit: P,              // up to 8 bytes
+        gas-used: P,               // up to 8 bytes
+        time: P,                   // up to 8 bytes
+        extradata: B,              // up to 32 bytes
+        mix-digest: B_32,          // 32!
+        block-nonce: B_8,          // 8!
+        basefee-per-gas: P,        // up to 32 bytes
+        withdrawals-root: B_32,    // 32!
+        blob-gas-used: P,          // up to 8 bytes
+        excess-blob-gas: P,        // up to 8 bytes
+        parent-beacon-root: B_32,  // 32!
+        requests-hash: B_32,       // 32!
     ]
 
 In certain protocol messages, the transaction and ommer lists are relayed together as a
 single item called the 'block body'.
 
-    block-body = [transactions, ommers, withdrawals]
-    transactions = [tx₁, tx₂, ...]
-    ommers = [header₁, header₂, ...]
-    withdrawals = [withdrawal₁, withdrawal₂, ...]
+    block-body = [
+        transactions,  // up to 10485760 bytes, up to 10485760 items
+        ommers,        // up to 2048 bytes, up to 2 items
+        withdrawals,   // up to 10485760 bytes, up to 10485760 items
+    ]
+    transactions = [tx₁, tx₂, ...]              // up to 10485760 bytes, up to 10485760 items
+    ommers = [header₁, header₂, ...]            // up to 2048 bytes, up to 2 items
+    withdrawals = [withdrawal₁, withdrawal₂, ...] // up to 10485760 bytes, up to 10485760 items
 
 For the purpose of block propagation (now defunct), full blocks were relayed as a combined item:
 
-    block = [header, transactions, ommers]
+    block = [
+        header,        // up to 1024 bytes, up to 1024 items
+        transactions,  // up to 10485760 bytes, up to 10485760 items
+        ommers,        // up to 2048 bytes, up to 2 items
+    ]
 
 The validity of block headers depends on the context in which they are used. For a single
 block header, only the validity of the proof-of-work seal (`mix-digest`, `block-nonce`)
@@ -282,15 +301,15 @@ available for the purpose of syncing the chain without re-executing transactions
 receipts have the same encoding regardless of transaction type.
 
     receiptₙ = [
-        tx-type: P,
-        post-state-or-status: B,
-        cumulative-gas: P,
-        logs: [log₁, log₂, ...],
+        tx-type: P,               // up to 1 bytes
+        post-state-or-status: B,  // up to 32 bytes
+        cumulative-gas: P,        // up to 8 bytes
+        logs: [log₁, log₂, ...],  // up to 10485760 bytes, up to 10485760 items
     ]
     logₙ = [
-        address: B_20,
-        topics: [topic₁: B, topic₂: B, ...],
-        data: B,
+        address: B_20,                    // 20!
+        topics: [topic₁: B_32, ...],      // up to 128 bytes, up to 4 items
+        data: B,                          // up to 10485760 bytes
     ]
 
 In the Ethereum Wire Protocol, receipts are always transferred as the complete list of all
@@ -309,6 +328,10 @@ necessary to define any further validity rules for receipts in this specificatio
 In most messages, the first element of the message data list is the `request-id`. For
 requests, this is a 64-bit integer value chosen by the requesting peer. The responding
 peer must mirror the value in the `request-id` element of the response message.
+
+Unless stated more narrowly, the message signatures below inherit the `P`, `B`, and `B_N`
+bounds from the type legend above, with `request-id` as `// up to 8 bytes` and an enclosing geth
+payload cap of `10,485,760` bytes.
 
 ### Status (0x00)
 
@@ -645,4 +668,5 @@ Version numbers below 60 were used during the Ethereum PoC development phase.
 [London hard fork]: https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/london.md
 [Shanghai fork]: https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md
 [Cancun fork]: https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md
+[RLP notation]: ../rlp.md
 [Yellow Paper]: https://ethereum.github.io/yellowpaper/paper.pdf

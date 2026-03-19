@@ -40,6 +40,15 @@ endpoint information is still valid as long as its signature is valid. If no `tc
 the same port number in both `tcp`, `tcp6` or `udp`, `udp6` should be avoided but doesn't
 render the record invalid.
 
+### RLP Types
+
+The RLP definitions below use the shared [RLP notation] plus the following local aliases:
+
+- `Sig64`: secp256k1 signature without the recovery ID, fixed at 64 bytes.
+- `Seq`: ENR sequence number, a `uint64` encoded as an RLP integer.
+- `Key`: ENR key byte string. ASCII text is preferred, but any byte string is valid.
+- `Value`: ENR value byte string.
+
 ### RLP Encoding
 
 The canonical encoding of a node record is an RLP list of `[signature, seq, k, v, ...]`.
@@ -48,9 +57,20 @@ records larger than this size.
 
 Records are signed and encoded as follows:
 
-    content   = [seq, k, v, ...]
-    signature = sign(content)
-    record    = [signature, seq, k, v, ...]
+    content = [
+        seq: Seq,  // up to 8 bytes
+        k: Key,    // up to 300 bytes
+        v: Value,  // up to 300 bytes
+        ...
+    ]
+    signature = sign(content) // 64!
+    record = [
+        signature: Sig64,  // 64!
+        seq: Seq,          // up to 8 bytes
+        k: Key,            // up to 300 bytes
+        v: Value,          // up to 300 bytes
+        ...
+    ]
 
 ### Text Encoding
 
@@ -112,17 +132,18 @@ private key:
 The RLP structure of the record is:
 
     [
-      7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c,
-      01,
-      "id",
-      "v4",
-      "ip",
-      7f000001,
-      "secp256k1",
-      03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138,
-      "udp",
-      765f,
+      7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c, // signature: 64!
+      01,                                                                                                                               // seq: up to 8 bytes
+      "id",                                                                                                                             // key: up to 300 bytes
+      "v4",                                                                                                                             // value: up to 300 bytes
+      "ip",                                                                                                                             // key: up to 300 bytes
+      7f000001,                                                                                                                         // value: 4!
+      "secp256k1",                                                                                                                      // key: up to 300 bytes
+      03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138,                                                               // value: 33!
+      "udp",                                                                                                                            // key: up to 300 bytes
+      765f,                                                                                                                             // value: up to 2 bytes
     ]
 
+[RLP notation]: ./rlp.md
 [EIP-778]: https://eips.ethereum.org/EIPS/eip-778
 [URL-safe base64 alphabet]: https://tools.ietf.org/html/rfc4648#section-5
